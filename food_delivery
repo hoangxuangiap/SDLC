@@ -1,0 +1,735 @@
+<?php
+session_start(); // This line MUST be at the very top of the file
+
+// Khởi tạo biến $connect và gọi file kết nối
+$connect = false; 
+@include('db.php'); 
+
+// ========================================================
+// 🛠️ HÀM XỬ LÝ GIỎ HÀNG (CART FUNCTION)
+// ========================================================
+function cart() {
+    if(isset($_GET['add_cart'])) {
+        $pro_id = $_GET['add_cart'];
+        
+        if(!isset($_SESSION['cart'])) {
+            $_SESSION['cart'] = array();
+        }
+
+        // Thêm ID sản phẩm vào mảng giỏ hàng (chỉ thêm nếu chưa có)
+        if(!in_array($pro_id, $_SESSION['cart'])) {
+            $_SESSION['cart'][] = $pro_id;
+        }
+        
+        // Chuyển hướng để xóa tham số ?add_cart khỏi URL
+        header("Location: food_delivery.php");
+        exit();
+    }
+}
+cart(); // Gọi hàm xử lý giỏ hàng
+
+// Function to retrieve and filter products
+function getPro($connect) {
+    // Sử dụng kiểm tra $connect an toàn
+    if ($connect === false) {
+        return ['title' => "DB Connection Error", 'result' => false];
+    }
+    
+    $where_clause = "1";
+    $title = "All Delicious Products"; 
+
+    // Handle FILTERING and SEARCHING
+    if(isset($_GET['category']) && !empty($_GET['category'])) {
+        $cat_slug = mysqli_real_escape_string($connect, $_GET['category']);
+        $where_clause .= " AND product_category = '$cat_slug'";
+        $title = "Products by Category: " . ucfirst($cat_slug);
+    } 
+    elseif(isset($_GET['brand']) && !empty($_GET['brand'])) {
+        $brand_slug = mysqli_real_escape_string($connect, $_GET['brand']);
+        $where_clause .= " AND product_brand = '$brand_slug'";
+        $title = "Products by Brand: " . strtoupper($brand_slug);
+    } 
+    elseif(isset($_GET['search']) && !empty($_GET['user_query'])) {
+        $search_query = mysqli_real_escape_string($connect, $_GET['user_query']);
+        $where_clause .= " AND product_name LIKE '%$search_query%'";
+        $title = "Search Results for: '" . htmlspecialchars($_GET['user_query']) . "'";
+    }
+
+    $sql = "SELECT * FROM product WHERE $where_clause ORDER BY product_id DESC";
+    $result = mysqli_query($connect, $sql);
+    
+    return ['title' => $title, 'result' => $result];
+}
+
+$products_data = getPro($connect);
+$db_error = ($connect === false);
+
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Delivery Website - Home</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <style type="text/css">
+        /* General Setup and Typography */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Wrapper Structure */
+        .wrapper {
+            width: 1200px;
+            margin: 30px auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        /* Header */
+        .header {
+            height: 80px;
+            padding: 0 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* LOGO STYLES */
+        .logo {
+            width: auto; 
+            padding: 0;
+            display: flex;
+            align-items: center; 
+        }
+
+        .site-logo {
+            text-decoration: none; 
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-icon {
+            font-size: 32px;
+            color: #FF5722; 
+            transition: color 0.3s ease;
+        }
+
+        .logo-text {
+            font-family: 'Poppins', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: #333; 
+            transition: color 0.3s ease;
+        }
+
+        .site-logo:hover .logo-icon {
+            color: #E64A19; 
+        }
+
+        .site-logo:hover .logo-text {
+            color: #4CAF50; 
+        }
+        /* END LOGO STYLES */
+
+        /* Search Bar */
+        #form_search {
+            display: flex;
+            margin: 0;
+            order: 2;
+            flex-grow: 1;
+            max-width: 400px;
+            margin: 0 40px;
+        }
+
+        #form_search input[type=text] {
+            width: 100%;
+            height: 40px;
+            padding: 0 15px;
+            border: 1px solid #d1d9e6;
+            border-radius: 8px 0 0 8px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #form_search input[type=text]:focus {
+            border-color: #FF5722;
+            box-shadow: 0 0 0 2px rgba(255, 87, 34, 0.2);
+        }
+
+        #form_search input[type=submit] {
+            height: 40px;
+            background-color: #FF5722;
+            color: white;
+            border: none;
+            padding: 0 20px;
+            cursor: pointer;
+            border-radius: 0 8px 8px 0;
+            font-weight: 600;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        #form_search input[type=submit]:hover {
+            background-color: #E64A19;
+        }
+
+        /* User Info (Login/Register/Welcome) */
+        .user-info {
+            padding: 0;
+            text-align: right;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 14px;
+            font-weight: 500;
+            order: 3;
+        }
+
+        .user-info span {
+            display: inline;
+        }
+        
+        .user-info .welcome-message {
+            color: #4CAF50; 
+            font-weight: 600;
+        }
+
+        .user-info a {
+            color: #FF5722;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .user-info a:hover {
+            text-decoration: underline;
+            color: #E64A19;
+        }
+
+        /* Main Menu */
+        .menu {
+            width: 100%;
+            height: 50px;
+            background: #4CAF50;
+            line-height: 50px;
+        }
+
+        .menu ul {
+            margin: 0;
+            padding: 0 20px;
+            text-align: left;
+        }
+
+        .menu ul li {
+            list-style: none;
+            display: inline-block;
+        }
+
+        .menu ul li a {
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            padding: 0 18px;
+            transition: background-color 0.3s;
+            text-transform: uppercase;
+        }
+
+        .menu ul li a:hover {
+            background-color: #388E3C;
+        }
+
+        /* Content Area */
+        .content {
+            display: flex;
+            min-height: 700px;
+        }
+
+        .left {
+            width: 250px;
+            background: #f8f8f8;
+            padding-bottom: 20px;
+            border-right: 1px solid #e0e0e0;
+        }
+
+        .right {
+            flex-grow: 1;
+            background: #ffffff;
+            padding: 30px;
+        }
+
+        .left>p {
+            background: #FF9800;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            padding: 15px;
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        /* Categories/Brands Menu */
+        .category ul, .brand ul {
+            padding: 10px 0;
+            list-style: none;
+        }
+
+        .category ul li a, .brand ul li a {
+            display: block;
+            color: #444;
+            padding: 12px 20px;
+            font-size: 15px;
+            text-decoration: none;
+            border-bottom: none;
+            transition: background-color 0.2s, color 0.2s, padding-left 0.2s;
+            font-weight: 500;
+        }
+
+        .category a:hover, .brand a:hover {
+            background-color: #ffe8d6;
+            color: #FF5722;
+            padding-left: 25px;
+        }
+
+        /* Product Box Area */
+        .right > p.section-title {
+            text-align: left;
+            font-size: 28px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 30px;
+            padding-left: 10px;
+            border-left: 5px solid #FF5722;
+            display: inline-block;
+        }
+
+        .products_box {
+            width: 100%;
+            text-align: center;
+            margin: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        .single_product {
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            border-radius: 10px;
+            background-color: #fff;
+            transition: transform 0.3s, box-shadow 0.3s;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .single_product:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .product-content {
+            flex-grow: 1;
+        }
+        
+        .single_product h3 {
+            font-size: 18px;
+            color: #333;
+            margin-top: 10px;
+            margin-bottom: 15px;
+            min-height: 45px;
+            overflow: hidden;
+            font-weight: 600;
+        }
+
+        .single_product img {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            margin-bottom: 10px;
+        }
+
+        .product-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .product-actions b {
+            color: #FF5722;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .product-actions a.details-link {
+            text-decoration: none;
+            color: #007bff;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .product-actions a.details-link:hover {
+            color: #E64A19;
+        }
+
+        .product-actions button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+
+        .product-actions button:hover {
+            background-color: #388E3C;
+        }
+
+        /* Footer */
+        .footer {
+            width: 1200px;
+            height: 60px;
+            background: #2c3e50;
+            color: #bdc3c7;
+            text-align: center;
+            line-height: 60px;
+            clear: both;
+            font-size: 14px;
+            margin: auto;
+            border-radius: 0 0 12px 12px;
+        }
+    </style>
+</head>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>FoodExpress - Giao đồ ăn nhanh</title>
+
+<!-- GOOGLE FONTS -->
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+    body {
+        margin: 0;
+        font-family: "Poppins", sans-serif;
+        background: #fff8f2;
+    }
+
+    /* HEADER */
+    header {
+        background: linear-gradient(90deg, #ff7a00, #ffbd39);
+        padding: 20px 30px;
+        color: white;
+        font-size: 28px;
+        font-weight: 600;
+        box-shadow: 0 3px 12px rgba(255, 149, 0, 0.4);
+    }
+
+    /* WELCOME OVERLAY */
+    .welcome-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        animation: fadeIn 0.5s forwards;
+        z-index: 9999;
+    }
+
+    .welcome-card {
+        width: min(750px, 95%);
+        padding: 30px;
+        border-radius: 20px;
+        background: white;
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        transform: scale(0.8);
+        animation: zoomIn 0.6s forwards;
+    }
+
+    /* Welcome image */
+    .welcome-card img {
+        width: 180px;
+        height: 180px;
+        border-radius: 16px;
+        object-fit: cover;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    }
+
+    /* TEXT */
+    .welcome-text h2 {
+        margin: 0 0 12px;
+        font-size: 26px;
+        color: #333;
+        font-weight: 600;
+    }
+
+    .welcome-text p {
+        margin: 0 0 18px;
+        font-size: 15px;
+        color: #555;
+        line-height: 1.5;
+    }
+
+    /* BUTTONS */
+    .btn {
+        padding: 12px 22px;
+        border-radius: 12px;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.2s;
+        font-size: 15px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(90deg, #ff7a00, #ff9f3a);
+        color: white;
+        box-shadow: 0 6px 20px rgba(255, 130, 0, 0.4);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(255, 130, 0, 0.6);
+    }
+
+    .btn-light {
+        background: #f1f1f1;
+        color: #333;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .btn-light:hover {
+        background: #e5e5e5;
+        transform: translateY(-2px);
+    }
+
+    /* MAIN CONTENT DEMO */
+    .container {
+        max-width: 1100px;
+        margin: 40px auto;
+        padding: 0 20px;
+        text-align: center;
+    }
+    .container h2 {
+        font-size: 32px;
+        font-weight: 600;
+    }
+
+    /* ANIMATION */
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; pointer-events: auto; }
+    }
+    @keyframes zoomIn {
+        from { transform: scale(0.7); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    /* Responsive mobile */
+    @media (max-width: 600px) {
+        .welcome-card {
+            flex-direction: column;
+            text-align: center;
+        }
+        .welcome-card img {
+            width: 150px;
+            height: 150px;
+        }
+    }
+</style>
+
+</head>
+<body>
+
+<header>🍔 FoodExpress</header>
+
+<!-- MAIN PAGE CONTENT -->
+<div class="container">
+    <h2>Chào mừng đến với FoodExpress</h2>
+    <p>Giao đồ ăn siêu tốc, hàng trăm món ngon chờ bạn!</p>
+</div>
+
+<!-- WELCOME POPUP -->
+<div class="welcome-overlay" id="welcomeOverlay">
+    <div class="welcome-card">
+        <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=500&q=60" alt="food">
+        
+        <div class="welcome-text">
+            <h2>Chào mừng bạn đến với FoodExpress! 🍕</h2>
+            <p>
+                Món ngon gần bạn, giao nhanh chỉ 25 phút.  
+                <br>Dùng mã <b>WELCOME10</b> để giảm 10% cho đơn đầu tiên!
+            </p>
+
+            <button class="btn btn-primary" id="orderBtn">Đặt hàng ngay</button>
+            <button class="btn btn-light" id="closeBtn">Đóng</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const overlay = document.getElementById("welcomeOverlay");
+    const closeBtn = document.getElementById("closeBtn");
+    const orderBtn = document.getElementById("orderBtn");
+
+    // Đóng popup
+    closeBtn.addEventListener("click", () => {
+        overlay.style.display = "none";
+    });
+
+    // Chuyển sang menu
+    orderBtn.addEventListener("click", () => {
+        window.location.href = "menu.php";  // đổi sang link của bạn
+    });
+
+    // Bấm ngoài popup sẽ tắt
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) overlay.style.display = "none";
+    });
+</script>
+
+</body>
+<body>
+    <div class="wrapper">
+        <div class="header">
+            <div class="logo">
+                <a href="food_delivery.php" class="site-logo">
+                    <i class="fas fa-utensils logo-icon"></i> 
+                    <span class="logo-text">FoodieExpress</span> 
+                </a>
+            </div>
+
+            <div id="form_search">
+                 <form method="get" action="food_delivery.php" enctype="multipart/form-data">
+                    <input type="text" name="user_query" placeholder="Search product..." 
+                            value="<?php echo isset($_GET['user_query']) ? htmlspecialchars($_GET['user_query']) : ''; ?>" />
+                    <input type="submit" name="search" value="Search" />
+                </form>
+            </div>
+
+            <div class="user-info">
+                <?php if (isset($_SESSION['fullname'])): ?>
+                    <span class="welcome-message">Hello, <?php echo htmlspecialchars($_SESSION['fullname']); ?></span>
+                    <?php if(isset($_SESSION['role_id']) && $_SESSION['role_id'] == 1): ?>
+                        <a href="Admin/index.php">Admin Panel</a>
+                    <?php endif; ?>
+                    <a href="logout.php">Logout</a>
+                <?php else: ?>
+                    <a href="login.php">Login</a>
+                    <a href="register.php">Register</a>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="menu">
+            <ul>
+                <li> <a href="food_delivery.php"> Home </a> </li>
+                <li> <a href="Admin/view_product.html">Manage Products </a></li>
+                <li><a href="add_product.php"> Add Product </a> </li>
+                <li>
+                    <a href="cart.php"> 
+                        <i class="fas fa-shopping-cart"></i> 
+                        Cart 
+                        (<?php echo isset($_SESSION['cart']) ? count($_SESSION['cart']) : 0; ?>)
+                    </a> 
+                </li>
+                <li><a href="about.html"> About Us </a></li>
+            </ul>
+        </div>
+
+        <div class="content">
+            <div class="left">
+                <p> 🍔 Product Category </p>
+                <div class="category">
+                    <ul>
+                        <li> <a href="food_delivery.php?category=bun">Bún </a></li>
+                        <li> <a href="food_delivery.php?category=pho">Phở </a></li>
+                        <li> <a href="food_delivery.php?category=com">Cơm </a></li>
+                        <li> <a href="food_delivery.php?category=banh">Bánh (Các Loại) </a></li>
+                        <li> <a href="food_delivery.php?category=banh">Gà </a></li>
+                        <li> <a href="food_delivery.php?category=banh">Cháo </a></li>
+                    </ul>
+                </div>
+                <p> 🏷️ Brand </p>
+                <div class="brand">
+                    <ul>
+                        <li> <a href="food_delivery.php?brand=kfc">KFC </a></li>
+                        <li> <a href="food_delivery.php?brand=lotteria">Lotteria </a></li>
+                        <li> <a href="food_delivery.php?brand=Tự Làm">Tự làm </a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="right">
+                <p class="section-title"><?php echo htmlspecialchars($products_data['title']); ?></p> 
+                
+                <div class="products_box">
+                    <?php if ($db_error): ?>
+                        <h3 style='color: red; width: 100%;'>Error: Could not connect to the database. Please check db.php and ensure MySQL is running.</h3>
+                    <?php 
+                    elseif ($products_data['result'] && mysqli_num_rows($products_data['result']) > 0): ?>
+                        
+                        <?php while ($row_product = mysqli_fetch_array($products_data['result'])): 
+                                $product_id = $row_product['product_id'];
+                                $product_name = $row_product['product_name'];
+                                // Format currency (assuming VNĐ)
+                                $product_price = number_format($row_product['product_price'], 0, ',', '.') . ' VNĐ';
+                                $product_image = $row_product['product_image'];
+                        ?>
+
+                            <div class="single_product">
+                                <div class="product-content">
+                                    <h3><?php echo htmlspecialchars($product_name) ?></h3>
+                                    <img src="images/<?php echo htmlspecialchars($product_image) ?>" 
+                                         alt="<?php echo htmlspecialchars($product_name) ?>" />
+                                </div>
+                                
+                                <div class="product-actions">
+                                    <b><?php echo $product_price ?></b>
+                                    <a href="details.php?pro_id=<?php echo $product_id ?>" class="details-link">Details</a>
+                                    <a href="food_delivery.php?add_cart=<?php echo $product_id ?>">
+                                        <button>Add to Cart</button>
+                                    </a>
+                                </div>
+                            </div>
+                        <?php endwhile; ?>
+
+                    <?php else: ?>
+                        <h3 style='color: #777; width: 100%; text-align: center;'>
+                            No products found!
+                        </h3>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        </div>
+</body>
+</html>
