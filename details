@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chi tiết sản phẩm</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 30px;
+        }
+
+        .product-container {
+            display: flex;
+            gap: 30px;
+        }
+
+        .product-image img {
+            width: 500px;
+            height: 450px;
+            object-fit: cover;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .product-info {
+            max-width: 500px;
+        }
+
+        .product-info h2 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .price {
+            color: red;
+            font-size: 22px;
+            margin-bottom: 15px;
+        }
+
+        .btn-add {
+            padding: 12px 25px;
+            background: green;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 8px;
+            transition: 0.3s;
+        }
+
+        .btn-add:hover {
+            background: darkgreen;
+        }
+
+        .divider {
+            border-bottom: 1px solid black;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+<?php 
+$connect = mysqli_connect('localhost','root','', 'food_delivery');
+
+if(!$connect){
+    die("Kết nối thất bại!");
+}
+
+if (!isset($_GET["id"])) {
+    die("Không tìm thấy sản phẩm!");
+}
+
+$id = $_GET["id"];
+
+$sql = "SELECT * FROM product WHERE product_id = '$id'";
+$result = mysqli_query($connect, $sql);
+
+if (mysqli_num_rows($result) == 0) {
+    die("<h2>Không có sản phẩm nào phù hợp!</h2>");
+}
+
+while ($row = mysqli_fetch_assoc($result)) {
+    $product_id = $row['product_id'];
+?>
+
+<div class="product-container">
+
+    <!-- Hình sản phẩm -->
+    <div class="product-image">
+        <img src="images/<?php echo $row['product_image']; ?>">
+    </div>
+
+    <!-- Thông tin sản phẩm -->
+    <div class="product-info">
+        <h2><?php echo $row['product_name']; ?></h2>
+
+        <div class="price">
+            Giá: <?php echo $row['product_price'] . " VND"; ?>
+        </div>
+
+        <!-- Nút Add to cart -->
+        <a href="single.php?add_cart=<?php echo $product_id; ?>">
+            <button class="btn-add">Thêm vào giỏ hàng</button>
+        </a>
+
+        <?php include("add_cart.php"); ?>
+
+        <div class="divider"></div>
+
+        <h3>Thông tin sản phẩm:</h3>
+        <p><?php echo $row['product_description']; ?></p>
+    </div>
+
+</div>
+
+<?php 
+} 
+?>
+
+</body>
+</html>
